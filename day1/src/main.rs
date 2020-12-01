@@ -3,7 +3,7 @@ use std::path::Path;
 use std::io::{BufReader, BufRead};
 
 fn get_input() -> Vec<i32> {
-    let input_path = Path::new("/home/asadjb/Programming/advent-of-code-20/day1/input.txt");
+    let input_path = Path::new("input.txt");
     let f = match File::open(input_path) {
         Err(why) => panic!("could not open {}: {}", input_path.display(), why),
         Ok(file) => file
