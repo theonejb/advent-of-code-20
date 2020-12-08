@@ -68,7 +68,7 @@ impl Display for Graph {
     }
 }
 
-enum DijkstraResult {
+enum DFSResult {
     Found(Vec<String>),
     NotFound
 }
@@ -141,9 +141,9 @@ impl Graph {
     }
 
     pub fn find_route(&self, from_bag_name: &str, to_bag_name: &str) -> Option<Vec<String>> {
-        match self.dijkstra(from_bag_name, to_bag_name) {
-            DijkstraResult::Found(path) => Some(path),
-            DijkstraResult::NotFound => None
+        match self.dfs(from_bag_name, to_bag_name) {
+            DFSResult::Found(path) => Some(path),
+            DFSResult::NotFound => None
         }
     }
 
@@ -163,9 +163,9 @@ impl Graph {
         return n;
     }
 
-    fn dijkstra(&self, from_bag_name: &str, to_bag_name: &str) -> DijkstraResult {
+    fn dfs(&self, from_bag_name: &str, to_bag_name: &str) -> DFSResult {
         if from_bag_name == to_bag_name {
-            return DijkstraResult::Found(vec![]);
+            return DFSResult::Found(vec![]);
         }
 
         let edges_to_explore = self.edges.get(from_bag_name).unwrap();
@@ -177,14 +177,14 @@ impl Graph {
 
         for current_bag in bags_to_explore.iter() {
             let current_bag = *current_bag;
-            if let DijkstraResult::Found(path) = self.dijkstra(current_bag, to_bag_name) {
+            if let DFSResult::Found(path) = self.dfs(current_bag, to_bag_name) {
                 let mut path = path;
                 path.insert(0, String::from(from_bag_name));
-                return DijkstraResult::Found(path);
+                return DFSResult::Found(path);
             }
         }
 
-        return DijkstraResult::NotFound
+        return DFSResult::NotFound
     }
 
     fn has_bag_type_with_name(&self, bag_name: &str) -> bool {
