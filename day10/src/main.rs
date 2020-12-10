@@ -1,9 +1,6 @@
-mod tests;
-
 use std::path::Path;
 use std::fs::File;
 use std::io::{BufReader, BufRead};
-use crate::AdapterTestResults::{JoltsShallNotPass, FoundAWay};
 use std::collections::HashMap;
 
 fn get_input(filename: &str) -> Vec<i32> {
@@ -19,37 +16,6 @@ fn get_input(filename: &str) -> Vec<i32> {
     }
 
     input
-}
-
-#[derive(Debug)]
-enum AdapterTestResults {
-    FoundAWay(Vec<i32>),
-    JoltsShallNotPass
-}
-
-fn test_all_adapters(current_joltage: i32, remaining_adapters: &Vec<i32>) -> AdapterTestResults {
-    if remaining_adapters.is_empty() {
-        return FoundAWay(vec![]);
-    }
-
-    for (i, adapter) in remaining_adapters.iter().enumerate() {
-        let joltage_difference = adapter - current_joltage;
-
-        if joltage_difference >= 1 && joltage_difference <= 3 {
-            let mut other_adapters = remaining_adapters.clone();
-            other_adapters.remove(i);
-
-            if let FoundAWay(adapter_chain) = test_all_adapters(
-                *adapter, &other_adapters
-            ) {
-                let mut chain_with_this_adapter = adapter_chain;
-                chain_with_this_adapter.push(*adapter);
-                return FoundAWay(chain_with_this_adapter);
-            }
-        }
-    }
-
-    JoltsShallNotPass
 }
 
 fn get_histogram_of_joltage_jumps(adapter_chain: &Vec<i32>) -> HashMap<i32, i32> {
@@ -76,12 +42,9 @@ fn get_histogram_of_joltage_jumps(adapter_chain: &Vec<i32>) -> HashMap<i32, i32>
 fn main() {
     let mut input = get_input("input.txt");
     input.sort();
-    let chain = test_all_adapters(0, &input);
-    if let FoundAWay(chain) = chain {
-        let histogram = get_histogram_of_joltage_jumps(&chain);
-        let final_answer = histogram.get(&1).unwrap() * histogram.get(&3).unwrap();
-        println!("{}", final_answer);
-    } else {
-        println!("Unable to find a way.");
-    }
+    input.reverse();
+
+    let histogram = get_histogram_of_joltage_jumps(&input);
+    let final_answer = histogram.get(&1).unwrap() * histogram.get(&3).unwrap();
+    println!("{}", final_answer);
 }
