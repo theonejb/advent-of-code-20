@@ -42,25 +42,25 @@ fn test_move_ship() {
     let mut ship = Ship::new();
 
     ship.move_ship(&MovementInstruction::compile("F10"));
-    assert_eq!(ship.east, 10);
-    assert_eq!(ship.north, 0);
+    assert_eq!(ship.east, 10.0);
+    assert_eq!(ship.north, 0.0);
 
     ship.move_ship(&MovementInstruction::compile("N3"));
-    assert_eq!(ship.east, 10);
-    assert_eq!(ship.north, 3);
+    assert_eq!(ship.east, 10.0);
+    assert_eq!(ship.north, 3.0);
 
     ship.move_ship(&MovementInstruction::compile("F7"));
-    assert_eq!(ship.east, 17);
-    assert_eq!(ship.north, 3);
+    assert_eq!(ship.east, 17.0);
+    assert_eq!(ship.north, 3.0);
 
     ship.move_ship(&MovementInstruction::compile("R90"));
     assert_eq!(ship.direction, South);
-    assert_eq!(ship.east, 17);
-    assert_eq!(ship.north, 3);
+    assert_eq!(ship.east, 17.0);
+    assert_eq!(ship.north, 3.0);
 
     ship.move_ship(&MovementInstruction::compile("F11"));
-    assert_eq!(ship.east, 17);
-    assert_eq!(ship.north, -8);
+    assert_eq!(ship.east, 17.0);
+    assert_eq!(ship.north, -8.0);
 }
 
 #[test]
@@ -79,5 +79,66 @@ fn test_get_manhattan_distance() {
         ship.move_ship(&MovementInstruction::compile(*instruction));
     }
 
-    assert_eq!(25, ship.get_manhattan_distance());
+    assert_eq!(25.0, ship.get_manhattan_distance());
+}
+
+#[test]
+fn test_rotate_waypoint() {
+    let waypoint = Ship::rotate_waypoint(
+        &Waypoint { east: 10.0, north: 4.0 },
+        Right,
+        90,
+    );
+
+    assert_eq!(waypoint.east.round(), 4.0);
+    assert_eq!(waypoint.north.round(), -10.0);
+
+    let waypoint = Ship::rotate_waypoint(
+        &waypoint,
+        Left,
+        90
+    );
+    assert_eq!(waypoint.east.round(), 10.0);
+    assert_eq!(waypoint.north.round(), 4.0);
+}
+
+#[test]
+fn test_move_waypoint() {
+    let waypoint = Waypoint { east:10.0, north: 1.0};
+    let waypoint = Ship::move_waypoint(&waypoint, North, 3);
+    assert_eq!(waypoint.east, 10.0);
+    assert_eq!(waypoint.north, 4.0);
+}
+
+#[test]
+fn test_move_ship_towards_waypoint() {
+    let mut ship = Ship::new();
+    ship.move_ship_towards_waypoint(10);
+    assert_eq!(ship.east, 100.0);
+    assert_eq!(ship.north, 10.0);
+}
+
+#[test]
+fn test_follow_instruction() {
+    let input = [
+        "F10",
+        "N3",
+        "F7",
+        "R90",
+        "F11",
+    ];
+
+    let mut ship = Ship::new();
+
+    for instruction in input.iter() {
+        ship.follow_instruction(&MovementInstruction::compile(*instruction));
+    }
+
+    assert_eq!(ship.east, 214.0);
+    assert_eq!(ship.north, -72.0);
+
+    assert_eq!(ship.waypoint.east, 4.0);
+    assert_eq!(ship.waypoint.north, -10.0);
+
+    assert_eq!(ship.get_manhattan_distance(), 286.0);
 }

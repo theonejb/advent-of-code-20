@@ -21,11 +21,11 @@ fn get_input(filename: &str) -> Vec<String> {
 
 fn main() {
     let input = get_input("input.txt");
-
+    //59816
     let mut ship = Ship::new();
     for instruction in input.iter() {
         let movement_instruction = MovementInstruction::compile(&instruction[..]);
-        ship.move_ship(&movement_instruction);
+        ship.follow_instruction(&movement_instruction);
     }
 
     println!("Manhattan distance: {}", ship.get_manhattan_distance());
