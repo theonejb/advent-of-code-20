@@ -30,11 +30,37 @@ To apply, we use the & and | operators with the corresponding values on the inco
 struct CompiledMask {
     or_value: u64,
     and_value: u64,
+    floating_indices: Vec<u8>,
 }
 
 impl CompiledMask {
     pub fn apply_mask(&self, to: u64) -> u64 {
         (to | self.or_value) & self.and_value
+    }
+
+    fn apply_floating_mask(indices: &[u8], to: u64) -> Vec<u64> {
+        if indices.is_empty() {
+            return vec![to];
+        }
+
+        let index_to_work_on = indices.first().unwrap();
+        let zero_mask = 0xFFFFFFFFFFFFFFFFu64 ^ (1 << index_to_work_on);
+        let one_mask = 0u64 | (1 << index_to_work_on);
+
+        let zero_value = to & zero_mask;
+        let one_value = to | one_mask;
+
+        let mut options_with_zero_value = CompiledMask::apply_floating_mask(&indices[1..], zero_value);
+        let mut options_with_one_value = CompiledMask::apply_floating_mask(&indices[1..], one_value);
+
+        let mut all_options = options_with_zero_value;
+        all_options.append(&mut options_with_one_value);
+
+        all_options
+    }
+
+    pub fn apply_maks_v2(&self, to: u64) -> Vec<u64> {
+        CompiledMask::apply_floating_mask(&self.floating_indices, to | self.or_value)
     }
 }
 
@@ -47,7 +73,7 @@ enum Instruction {
 impl DecoderChip {
     pub fn new() -> DecoderChip {
         DecoderChip {
-            mask: CompiledMask { or_value: 0, and_value: 0 },
+            mask: CompiledMask { or_value: 0, and_value: 0, floating_indices: vec![] },
             set_memory_locations: HashMap::new(),
         }
     }
@@ -73,6 +99,7 @@ impl DecoderChip {
 
     pub fn compile_mask(mask: &str) -> CompiledMask {
         let (mut or_value, mut and_value) = (0u64, 0xFFFFFFFFFFFFFFFFu64);
+        let mut floating_indices = vec![];
 
         for (i, mask_value) in mask.chars().rev().enumerate() {
             match mask_value {
@@ -82,11 +109,14 @@ impl DecoderChip {
                 '0' => {
                     and_value ^= 1 << i;
                 }
-                _ => {}
+                'X' => {
+                    floating_indices.push(i as u8);
+                }
+                _ => ()
             }
         }
 
-        CompiledMask { or_value, and_value }
+        CompiledMask { or_value, and_value, floating_indices }
     }
 
     fn apply_instruction(&mut self, instruction: Instruction) {
@@ -100,9 +130,27 @@ impl DecoderChip {
         }
     }
 
+    fn apply_instruction_v2(&mut self, instruction: Instruction) {
+        match instruction {
+            Instruction::SetMask(mask) => {
+                self.mask = DecoderChip::compile_mask(&mask[..]);
+            }
+            Instruction::SetMemory(at, value) => {
+                for memory_locations in self.mask.apply_maks_v2(at) {
+                    self.set_memory_locations.insert(memory_locations, value);
+                }
+            }
+        }
+    }
+
     pub fn compile_and_apply_instruction(&mut self, instruction: &str) {
         let instruction = DecoderChip::compile_instruction(instruction);
         self.apply_instruction(instruction);
+    }
+
+    pub fn compile_and_apply_instruction_v2(&mut self, instruction: &str) {
+        let instruction = DecoderChip::compile_instruction(instruction);
+        self.apply_instruction_v2(instruction);
     }
 
     pub fn run_program(&mut self, program: &Vec<String>) {
@@ -111,10 +159,16 @@ impl DecoderChip {
         }
     }
 
+    pub fn run_program_v2(&mut self, program: &Vec<String>) {
+        for instruction in program.iter() {
+            self.compile_and_apply_instruction_v2(&instruction[..]);
+        }
+    }
+
     pub fn sum_all_memory_values(&self) -> u64 {
         let mut sum = 0;
         for (_, value) in self.set_memory_locations.iter() {
-           sum += value;
+            sum += value;
         }
 
         sum
@@ -136,7 +190,12 @@ fn get_input(filename: &str) -> Vec<String> {
 
 fn main() {
     let input = get_input("input.txt");
+
     let mut chip = DecoderChip::new();
     chip.run_program(&input);
     println!("Result part 1: {}", chip.sum_all_memory_values());
+
+    let mut chip_v2 = DecoderChip::new();
+    chip_v2.run_program_v2(&input);
+    println!("Result part 2: {}", chip_v2.sum_all_memory_values());
 }

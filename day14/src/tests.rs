@@ -1,4 +1,6 @@
 use crate::{DecoderChip, Instruction};
+use std::collections::HashSet;
+use std::iter::FromIterator;
 
 #[test]
 fn test_compile_instruction() {
@@ -18,6 +20,38 @@ fn test_compile_mask() {
     assert_eq!(compiled_mask.and_value,
                0b1111111111111111111111111111111111111111111111111111111111111101,
                "And mask");
+
+    let compiled_mask = DecoderChip::compile_mask("000000000000000000000000000000X1001X");
+    assert_eq!(compiled_mask.floating_indices, vec![0, 5]);
+}
+
+#[test]
+fn test_apply_mask_v2() {
+    let mask = DecoderChip::compile_mask("000000000000000000000000000000X1001X");
+    let possible_values = mask.apply_maks_v2(42);
+    let expected_values = vec![26, 27, 58, 59];
+
+    let mut values_set = HashSet::new();
+    for v in possible_values {
+        values_set.insert(v);
+    }
+
+    for v in expected_values.iter() {
+        assert!(values_set.contains(v));
+    }
+
+    let mask = DecoderChip::compile_mask("00000000000000000000000000000000X0XX");
+    let possible_values = mask.apply_maks_v2(26);
+    let expected_values = vec![16, 17, 18, 19, 24, 25, 26, 27];
+
+    let mut values_set = HashSet::new();
+    for v in possible_values {
+        values_set.insert(v);
+    }
+
+    for v in expected_values.iter() {
+        assert!(values_set.contains(v));
+    }
 }
 
 #[test]
