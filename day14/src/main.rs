@@ -59,7 +59,7 @@ impl CompiledMask {
         all_options
     }
 
-    pub fn apply_maks_v2(&self, to: u64) -> Vec<u64> {
+    pub fn apply_mask_v2(&self, to: u64) -> Vec<u64> {
         CompiledMask::apply_floating_mask(&self.floating_indices, to | self.or_value)
     }
 }
@@ -136,7 +136,7 @@ impl DecoderChip {
                 self.mask = DecoderChip::compile_mask(&mask[..]);
             }
             Instruction::SetMemory(at, value) => {
-                for memory_locations in self.mask.apply_maks_v2(at) {
+                for memory_locations in self.mask.apply_mask_v2(at) {
                     self.set_memory_locations.insert(memory_locations, value);
                 }
             }

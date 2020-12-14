@@ -28,7 +28,7 @@ fn test_compile_mask() {
 #[test]
 fn test_apply_mask_v2() {
     let mask = DecoderChip::compile_mask("000000000000000000000000000000X1001X");
-    let possible_values = mask.apply_maks_v2(42);
+    let possible_values = mask.apply_mask_v2(42);
     let expected_values = vec![26, 27, 58, 59];
 
     let mut values_set = HashSet::new();
@@ -41,7 +41,7 @@ fn test_apply_mask_v2() {
     }
 
     let mask = DecoderChip::compile_mask("00000000000000000000000000000000X0XX");
-    let possible_values = mask.apply_maks_v2(26);
+    let possible_values = mask.apply_mask_v2(26);
     let expected_values = vec![16, 17, 18, 19, 24, 25, 26, 27];
 
     let mut values_set = HashSet::new();
