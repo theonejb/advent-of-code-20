@@ -43,7 +43,7 @@ impl CompiledMask {
             return vec![to];
         }
 
-        let index_to_work_on = indices.first().unwrap();
+        let index_to_work_on = indices[0];
         let zero_mask = 0xFFFFFFFFFFFFFFFFu64 ^ (1 << index_to_work_on);
         let one_mask = 0u64 | (1 << index_to_work_on);
 
