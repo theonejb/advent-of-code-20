@@ -44,7 +44,7 @@ impl MemoryGame {
             }
         }
 
-        let next_number_spoken_turns = self.spoken_numbers.get(&next_number);
+        let next_number_spoken_turns = self.spoken_numbers.get_mut(&next_number);
         match next_number_spoken_turns {
             None => {
                 self.spoken_numbers.insert(
@@ -54,15 +54,10 @@ impl MemoryGame {
             }
             Some(turns) => {
                 if turns.len() == 1 {
-                    self.spoken_numbers.insert(
-                        next_number,
-                        vec![turns[0], self.turn]
-                    );
+                    turns.push(self.turn)
                 } else {
-                    self.spoken_numbers.insert(
-                        next_number,
-                        vec![turns[1], self.turn]
-                    );
+                    turns[0] = turns[1];
+                    turns[1] = self.turn;
                 }
             }
         }
@@ -74,10 +69,6 @@ impl MemoryGame {
 
     pub fn nth(&mut self, n: u128) -> u128 {
         loop {
-            if self.turn % 100_000 == 0 {
-                println!("Turn: {}", self.turn)
-            }
-
             if self.turn == n - 1 {
                 return self.next_number();
             } else {
