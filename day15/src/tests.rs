@@ -39,22 +39,22 @@ fn test_nth() {
 fn test_part_2_nth() {
     let mut game = MemoryGame::new(&[0, 3, 6]);
     assert_eq!(game.nth(30_000_000), 175594);
-    //
-    // let mut game = MemoryGame::new(&[1, 3, 2]);
-    // assert_eq!(game.nth(30000000), 2578);
-    //
-    // let mut game = MemoryGame::new(&[2, 1, 3]);
-    // assert_eq!(game.nth(30000000), 3544142);
-    //
-    // let mut game = MemoryGame::new(&[1, 2, 3]);
-    // assert_eq!(game.nth(30000000), 261214);
-    //
-    // let mut game = MemoryGame::new(&[2, 3, 1]);
-    // assert_eq!(game.nth(30000000), 6895259);
-    //
-    // let mut game = MemoryGame::new(&[3, 2, 1]);
-    // assert_eq!(game.nth(30000000), 18);
-    //
-    // let mut game = MemoryGame::new(&[3, 1, 2]);
-    // assert_eq!(game.nth(30000000), 362);
+
+    let mut game = MemoryGame::new(&[1, 3, 2]);
+    assert_eq!(game.nth(30000000), 2578);
+
+    let mut game = MemoryGame::new(&[2, 1, 3]);
+    assert_eq!(game.nth(30000000), 3544142);
+
+    let mut game = MemoryGame::new(&[1, 2, 3]);
+    assert_eq!(game.nth(30000000), 261214);
+
+    let mut game = MemoryGame::new(&[2, 3, 1]);
+    assert_eq!(game.nth(30000000), 6895259);
+
+    let mut game = MemoryGame::new(&[3, 2, 1]);
+    assert_eq!(game.nth(30000000), 18);
+
+    let mut game = MemoryGame::new(&[3, 1, 2]);
+    assert_eq!(game.nth(30000000), 362);
 }
