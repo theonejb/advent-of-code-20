@@ -501,7 +501,6 @@ impl Arrangement {
 
             for variant in tile.variants.iter() {
                 if arrangement.can_fit_tile(tile_id, variant.variant_id, &point_to_fill, tiles) {
-                    println!("Trying with tile id {} at {}", tile_id, point_to_fill);
 
                     let mut new_arrangement = arrangement.clone();
                     new_arrangement.insert(&point_to_fill, tile_id, variant.variant_id);
