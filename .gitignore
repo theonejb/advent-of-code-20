@@ -11,3 +11,4 @@ Cargo.lock
 .idea
 target
 .ipynb_checkpoints/
+/day20/test_images/
