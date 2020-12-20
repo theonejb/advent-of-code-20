@@ -1,10 +1,15 @@
 use std::collections::HashMap;
+use std::env::var;
 use std::fmt::{Display, Formatter, Result};
 use std::fs::File;
 use std::i32::MAX;
-use image::{GrayImage, Luma, ColorType};
+
+use image::{ColorType, GrayImage, Luma};
 use image::bmp::BmpEncoder;
-use image::imageops::{resize, FilterType};
+use image::imageops::{FilterType, resize};
+use std::path::Path;
+use std::io::{BufReader, BufRead};
+
 
 mod tests;
 
@@ -29,7 +34,7 @@ impl Point {
     pub fn translate(&self, xt: i32, yt: i32) -> Point {
         Point {
             x: self.x + xt,
-            y: self.y + yt
+            y: self.y + yt,
         }
     }
 }
@@ -79,6 +84,7 @@ fn apply_transformations(p: &Point, transformations: &Vec<Matrix>) -> Point {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 enum Pixel { Black, White }
+
 impl Pixel {
     pub fn to_luma(&self) -> Luma<u8> {
         match self {
@@ -87,6 +93,7 @@ impl Pixel {
         }
     }
 }
+
 type Pixels = HashMap<Point, Pixel>;
 
 type TileId = u32;
@@ -97,7 +104,7 @@ struct Tile {
     pixels: Pixels,
     width: usize,
     height: usize,
-    variants: Vec<TileVariant>
+    variants: Vec<TileVariant>,
 }
 
 impl Tile {
@@ -110,12 +117,12 @@ impl Tile {
     }
 
     pub fn from_input(id: TileId, input: &Vec<String>) -> Tile {
-        let mut _self = Tile{
+        let mut _self = Tile {
             id,
             pixels: Pixels::new(),
             width: 0,
             height: 0,
-            variants: vec![]
+            variants: vec![],
         };
 
         for (y, row) in input.iter().enumerate() {
@@ -126,7 +133,7 @@ impl Tile {
                         '.' => Pixel::Black,
                         '#' => Pixel::White,
                         _ => panic!("Invalid pixel input value")
-                    }
+                    },
                 );
             }
         }
@@ -143,25 +150,21 @@ impl Tile {
 
         let all_transformations = vec![
             vec![],
-
             vec![Matrix::CW_ROTATE],
             vec![Matrix::CW_ROTATE, Matrix::CW_ROTATE],
             vec![Matrix::CW_ROTATE, Matrix::CW_ROTATE, Matrix::CW_ROTATE],
-
-            vec![Matrix::X_FLIP],
-            vec![Matrix::X_FLIP, Matrix::CW_ROTATE],
-            vec![Matrix::X_FLIP, Matrix::CW_ROTATE, Matrix::CW_ROTATE],
-            vec![Matrix::X_FLIP, Matrix::CW_ROTATE, Matrix::CW_ROTATE, Matrix::CW_ROTATE],
-
+            // vec![Matrix::X_FLIP],
+            // vec![Matrix::X_FLIP, Matrix::CW_ROTATE],
+            // vec![Matrix::X_FLIP, Matrix::CW_ROTATE, Matrix::CW_ROTATE],
+            // vec![Matrix::X_FLIP, Matrix::CW_ROTATE, Matrix::CW_ROTATE, Matrix::CW_ROTATE],
             vec![Matrix::Y_FLIP],
             vec![Matrix::Y_FLIP, Matrix::CW_ROTATE],
             vec![Matrix::Y_FLIP, Matrix::CW_ROTATE, Matrix::CW_ROTATE],
             vec![Matrix::Y_FLIP, Matrix::CW_ROTATE, Matrix::CW_ROTATE, Matrix::CW_ROTATE],
-
-            vec![Matrix::XY_FLIP],
-            vec![Matrix::XY_FLIP, Matrix::CW_ROTATE],
-            vec![Matrix::XY_FLIP, Matrix::CW_ROTATE, Matrix::CW_ROTATE],
-            vec![Matrix::XY_FLIP, Matrix::CW_ROTATE, Matrix::CW_ROTATE, Matrix::CW_ROTATE],
+            // vec![Matrix::XY_FLIP],
+            // vec![Matrix::XY_FLIP, Matrix::CW_ROTATE],
+            // vec![Matrix::XY_FLIP, Matrix::CW_ROTATE, Matrix::CW_ROTATE],
+            // vec![Matrix::XY_FLIP, Matrix::CW_ROTATE, Matrix::CW_ROTATE, Matrix::CW_ROTATE],
         ];
 
         for transformations in all_transformations.iter() {
@@ -171,6 +174,16 @@ impl Tile {
         }
 
         variants
+    }
+
+    pub fn get_variant_with_id(&self, id: VariantId) -> Option<&TileVariant> {
+        for v in self.variants.iter() {
+            if v.variant_id == id {
+                return Some(v);
+            }
+        }
+
+        None
     }
 }
 
@@ -194,13 +207,44 @@ impl Display for Tile {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum Side { Left, Top, Right, Bottom }
+
+struct Border {
+    pixels: Vec<Pixel>
+}
+
+impl Border {
+    pub fn new() -> Border {
+        Border {
+            pixels: vec![]
+        }
+    }
+}
+
+impl PartialEq for Border {
+    fn eq(&self, other: &Self) -> bool {
+        self.pixels == other.pixels
+    }
+}
+
+type VariantId = u32;
+
+static mut VARIANT_COUNTER: u32 = 0;
+
+unsafe fn get_next_variant_id() -> VariantId {
+    VARIANT_COUNTER += 1;
+    VARIANT_COUNTER
+}
+
 #[derive(Debug)]
 struct TileVariant {
     tile_id: TileId,
+    variant_id: VariantId,
     transformations: Vec<Matrix>,
     pixels: Pixels,
     width: usize,
-    height: usize
+    height: usize,
 }
 
 impl TileVariant {
@@ -213,12 +257,18 @@ impl TileVariant {
     }
 
     pub fn from_tile_with_transformations(tile: &Tile, transformations: &Vec<Matrix>) -> TileVariant {
-        let mut _self = TileVariant{
+        let variant_id;
+        unsafe {
+            variant_id = get_next_variant_id();
+        }
+
+        let mut _self = TileVariant {
             tile_id: tile.id,
+            variant_id,
             transformations: transformations.clone(),
             pixels: Pixels::new(),
             width: tile.width,
-            height: tile.height
+            height: tile.height,
         };
 
         let (mut min_x, mut min_y) = (MAX, MAX);
@@ -263,6 +313,24 @@ impl TileVariant {
         let mut larger_img = resize(&img, 512, 512, FilterType::Nearest);
         larger_img.save(filename);
     }
+
+    pub fn get_border(&self, side: Side) -> Border {
+        let (mut x, mut y, dx, dy) = match side {
+            Side::Left => (0, 0, 0, 1),
+            Side::Top => (0, 0, 1, 0),
+            Side::Right => (self.width - 1, 0, 0, 1),
+            Side::Bottom => (0, self.height - 1, 1, 0)
+        };
+
+        let mut border = Border::new();
+        while x < self.width && y < self.height {
+            border.pixels.push(self.get_pixel_value(&Point::new(x as i32, y as i32)));
+            x += dx;
+            y += dy;
+        }
+
+        border
+    }
 }
 
 impl Display for TileVariant {
@@ -291,6 +359,254 @@ impl Display for TileVariant {
     }
 }
 
+struct BunchOfTiles {
+    tiles: HashMap<TileId, Tile>
+}
+
+impl BunchOfTiles {
+    pub fn new() -> BunchOfTiles {
+        BunchOfTiles { tiles: HashMap::new() }
+    }
+
+    pub fn insert(&mut self, tile: Tile) {
+        self.tiles.insert(tile.id, tile);
+    }
+
+    pub fn get(&self, tile_id: TileId) -> &Tile {
+        self.tiles.get(&tile_id).unwrap()
+    }
+}
+
+#[derive(Clone)]
+struct Arrangement {
+    width: usize,
+    height: usize,
+    tiles: HashMap<Point, (TileId, VariantId)>,
+}
+
+/*
+The sides to match are:
+    0: The border side of the neighbour which touches us
+    1: Our border side which touches this neighbour
+ */
+#[derive(Debug, PartialEq)]
+struct Neighbour {
+    tile_id: TileId,
+    variant_id: VariantId,
+    sides_to_match: (Side, Side),
+}
+
+impl Arrangement {
+    pub fn new(width: usize, height: usize) -> Arrangement {
+        Arrangement {
+            width,
+            height,
+            tiles: HashMap::new(),
+        }
+    }
+
+    pub fn get_neighbours(&self, of: &Point) -> Vec<Neighbour> {
+        let mut neighbours = vec![];
+
+        for (dx, dy, sides) in [
+            (-1, 0, (Side::Right, Side::Left)),
+            (0, -1, (Side::Bottom, Side::Top)),
+            (1, 0, (Side::Left, Side::Right)),
+            (0, 1, (Side::Top, Side::Bottom))
+        ].iter() {
+            let x = of.x + dx;
+            let y = of.y + dy;
+
+            if !(x >= 0 && x < self.width as i32) {
+                continue;
+            }
+
+            if !(y >= 0 && y < self.height as i32) {
+                continue;
+            }
+
+            let neighbour_coord = Point::new(x, y);
+            if let Some(neighbour_id) = self.tiles.get(&neighbour_coord) {
+                neighbours.push(Neighbour {
+                    tile_id: neighbour_id.0,
+                    variant_id: neighbour_id.1,
+                    sides_to_match: sides.clone(),
+                });
+            }
+        }
+
+        neighbours
+    }
+
+    pub fn insert(&mut self, at: &Point, tile_id: TileId, variant_id: VariantId) {
+        self.tiles.insert(at.clone(), (tile_id, variant_id));
+    }
+
+    pub fn is_full(&self) -> bool {
+        (self.width * self.height) == self.tiles.len()
+    }
+
+    fn has_tile(&self, at: &Point) -> bool {
+        self.tiles.get(at).is_some()
+    }
+
+    fn first_empty_point(&self) -> Option<Point> {
+        for x in 0..self.width {
+            for y in 0..self.height {
+                let p = Point::new(x as i32, y as i32);
+                if !self.has_tile(&p) {
+                    return Some(p);
+                }
+            }
+        }
+
+        None
+    }
+
+    fn can_fit_tile(&self, tile_id: TileId, variant_id: VariantId, at: &Point, tiles_stack: &BunchOfTiles) -> bool {
+        if self.tiles.get(at).is_some() {
+            return false;
+        }
+
+        let us = tiles_stack.tiles.get(&tile_id).unwrap().get_variant_with_id(variant_id).unwrap();
+
+        let neighbours = self.get_neighbours(at);
+        for neighbour in neighbours {
+            if let Some(tile) = tiles_stack.tiles.get(&neighbour.tile_id) {
+                if let Some(variant) = tile.get_variant_with_id(neighbour.variant_id) {
+                    let their_border = variant.get_border(neighbour.sides_to_match.0);
+                    let our_border = us.get_border(neighbour.sides_to_match.1);
+
+                    if their_border != our_border {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
+    }
+
+    fn fill(arrangement: Arrangement, tiles: &BunchOfTiles, tiles_used: Vec<TileId>, tiles_remaining: Vec<TileId>) -> Option<Arrangement> {
+        if tiles_remaining.is_empty() {
+            return Some(arrangement);
+        }
+
+        let point_to_fill = arrangement.first_empty_point();
+        let point_to_fill = point_to_fill.unwrap();
+
+        for tile_id in tiles_remaining.iter() {
+            let tile_id = *tile_id;
+            let tile = tiles.get(tile_id);
+
+            for variant in tile.variants.iter() {
+                if arrangement.can_fit_tile(tile_id, variant.variant_id, &point_to_fill, tiles) {
+                    println!("Trying with tile id {} at {}", tile_id, point_to_fill);
+
+                    let mut new_arrangement = arrangement.clone();
+                    new_arrangement.insert(&point_to_fill, tile_id, variant.variant_id);
+
+                    let mut tiles_used = tiles_used.clone();
+                    tiles_used.push(tile_id);
+
+                    let mut new_tiles_remaining: Vec<TileId> = vec![];
+                    for tid in tiles_remaining.iter() {
+                        if *tid != tile_id {
+                            new_tiles_remaining.push(*tid);
+                        }
+                    }
+
+                    if let Some(arrangement) = Arrangement::fill(new_arrangement, tiles, tiles_used, new_tiles_remaining) {
+                        return Some(arrangement);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn find(of_size: usize, from: &BunchOfTiles) -> Option<Arrangement> {
+        let mut tiles_remaining: Vec<TileId> = vec![];
+        for tile_id in from.tiles.keys() {
+            tiles_remaining.push(*tile_id);
+        }
+        Arrangement::fill(
+            Arrangement::new(of_size, of_size),
+            from,
+            vec![],
+            tiles_remaining,
+        )
+    }
+}
+
+impl Display for Arrangement {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        for y in 0..self.height {
+            for x in 0..self.width {
+                if let Some(tile) = self.tiles.get(&Point::new(x as i32, y as i32)) {
+                    write!(f, "{:5}|{:0>2}\t", tile.0, tile.1);
+                } else {
+                    write!(f, "-----|--\t");
+                }
+            }
+            writeln!(f);
+        }
+
+        writeln!(f)
+    }
+}
+
+fn read_input(filename: &str) -> Vec<Tile> {
+    let mut tiles = vec![];
+
+    let f = File::open(Path::new(filename)).unwrap();
+    let mut current_tile_input = vec![];
+    let mut current_tile_id = 0;
+
+    for line in BufReader::new(f).lines() {
+        let line = line.unwrap();
+
+        if line.starts_with("Tile ") {
+            let line_parts: Vec<&str> = line.split(" ").collect();
+            let id_part = line_parts[1];
+            let id = &id_part[..id_part.len() - 1];
+            let id = id.parse::<u32>().unwrap();
+            current_tile_id = id;
+        } else if line.is_empty() {
+            tiles.push(
+                Tile::from_input(current_tile_id, &current_tile_input)
+            );
+
+            current_tile_id = 0;
+            current_tile_input = vec![];
+        } else {
+            current_tile_input.push(line);
+        }
+    }
+
+    if current_tile_id != 0 {
+        tiles.push(
+            Tile::from_input(current_tile_id, &current_tile_input)
+        );
+
+        current_tile_id = 0;
+        current_tile_input = vec![];
+    }
+
+    tiles
+}
+
 fn main() {
-    println!("Hello, world!");
+    let mut tiles = BunchOfTiles::new();
+    let input_tiles = read_input("input.txt");
+    for t in input_tiles {
+        tiles.insert(t);
+    }
+
+    if let Some(arrangement) = Arrangement::find(12, &tiles) {
+        println!("{}", arrangement);
+    } else {
+        println!("No arrangement found");
+    }
 }
