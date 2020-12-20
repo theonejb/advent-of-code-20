@@ -15,6 +15,12 @@ enum Rule {
     Options(Box<Rule>, Box<Rule>),
 }
 
+impl Rule {
+    pub fn display(&self) -> String {
+        format!("{}", self)
+    }
+}
+
 impl Display for Rule {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -28,9 +34,52 @@ impl Display for Rule {
                     }
                 }
                 write!(f, "]")
-            }
-            Rule::Options(rule1, rule2) => write!(f, "{} | {}", *rule1, *rule2)
+            },
+            Rule::Options(rule1, rule2) => write!(f, "{} | {}", rule1.display(), rule2.display())
         }
+    }
+}
+
+struct NestedPrinter {
+    level: usize,
+    min_print_level: usize,
+    mute: bool,
+}
+
+impl NestedPrinter {
+    pub fn new() -> NestedPrinter {
+        NestedPrinter { level: 0, min_print_level: 0, mute: false }
+    }
+
+    pub fn println(&self, output: &str) {
+        if self.mute || self.level < self.min_print_level {
+            return;
+        }
+
+        for _ in 0..self.level {
+            print!("|");
+        }
+
+        println!("- {}", output);
+    }
+
+    pub fn print_rule_and_input(&self, rule: &Rule, input: &str) {
+        if self.mute || self.level < self.min_print_level {
+            return;
+        }
+
+        for _ in 0..self.level {
+            print!("|");
+        }
+        println!("- Rule: {} Input: {}", rule, input);
+    }
+
+    pub fn down(&mut self) {
+        self.level += 1;
+    }
+
+    pub fn up(&mut self) {
+        self.level -= 1;
     }
 }
 
@@ -110,17 +159,16 @@ impl Rule {
     //endregion
 
     //region Matching
-    fn match_chain_rule(&self, rule_book: &RuleBook, input: &str) -> Option<RuleMatch> {
-        let mut does_match = true;
+    fn match_chain_rule(&self, rule_book: &RuleBook, input: &str, printer: &mut NestedPrinter) -> Option<RuleMatch> {
         let mut last_match_index = 0;
 
         if let Rule::Chain(components) = self {
             for component_id in components.iter() {
+                printer.println(&format!("Component id {}", component_id));
                 let rule = rule_book.get(component_id).unwrap();
-                match rule.do_match(rule_book, &input[last_match_index..]) {
+                match rule.do_match(rule_book, &input[last_match_index..], printer) {
                     None => {
-                        does_match = false;
-                        break;
+                        return None;
                     }
                     Some(rule_match) => {
                         last_match_index += rule_match.matched_chars;
@@ -129,22 +177,19 @@ impl Rule {
             }
         }
 
-        if does_match {
-            Some(RuleMatch { matched_chars: last_match_index })
-        } else {
-            None
-        }
+        Some(RuleMatch { matched_chars: last_match_index })
     }
 
-    fn match_options_rule(&self, rule_book: &RuleBook, input: &str) -> Option<RuleMatch> {
+    fn match_options_rule(&self, rule_book: &RuleBook, input: &str, printer: &mut NestedPrinter) -> Option<RuleMatch> {
         if let Rule::Options(option1, option2) = self {
-            let op1_match = option1.do_match(rule_book, input);
-            let op2_match = option2.do_match(rule_book, input);
-
+            printer.println("Trying option 1");
+            let op1_match = option1.do_match(rule_book, input, printer);
             if op1_match.is_some() {
                 return op1_match;
             }
 
+            printer.println("Trying option 2");
+            let op2_match = option2.do_match(rule_book, input, printer);
             if op2_match.is_some() {
                 return op2_match;
             }
@@ -153,34 +198,75 @@ impl Rule {
         None
     }
 
-    pub fn do_match(&self, rule_book: &RuleBook, input: &str) -> Option<RuleMatch> {
-        println!("Rule: {} Input: {}", self, input);
+    pub fn do_match(&self, rule_book: &RuleBook, input: &str, printer: &mut NestedPrinter) -> Option<RuleMatch> {
+        printer.print_rule_and_input(self, input);
+        printer.down();
 
         if input.is_empty() {
-            None
-        } else {
-            match self {
-                Rule::Match(c) => {
-                    if input.chars().nth(0).unwrap() == *c {
-                        Some(RuleMatch { matched_chars: 1 })
-                    } else {
-                        None
-                    }
-                }
-                Rule::Chain(_) => {
-                    self.match_chain_rule(rule_book, input)
-                }
-                Rule::Options(_, _) => {
-                    self.match_options_rule(rule_book, input)
+            return None;
+        }
+
+        let result = match self {
+            Rule::Match(c) => {
+                if input.chars().nth(0).unwrap() == *c {
+                    Some(RuleMatch { matched_chars: 1 })
+                } else {
+                    None
                 }
             }
+            Rule::Chain(_) => {
+                self.match_chain_rule(rule_book, input, printer)
+            }
+            Rule::Options(_, _) => {
+                self.match_options_rule(rule_book, input, printer)
+            }
+        };
+
+        printer.up();
+
+        result
+    }
+
+    fn do_complete_match(&self, rule_book: &RuleBook, input: &str, printer: &mut NestedPrinter) -> Option<RuleMatch> {
+        match self.do_match(rule_book, input, printer) {
+            Some(rule_match) => {
+                if rule_match.matched_chars == input.len() {
+                    Some(rule_match)
+                } else {
+                    None
+                }
+            }
+            None => None
         }
     }
 
     pub fn does_match_completely(&self, rule_book: &RuleBook, input: &str) -> bool {
-        match self.do_match(rule_book, input) {
+        let mut printer = NestedPrinter::new();
+        printer.mute = true;
+
+        match self.do_match(rule_book, input, &mut printer) {
             Some(rule_match) => rule_match.matched_chars == input.len(),
             None => false
+        }
+    }
+    //endregion
+
+    //region Expanding
+    pub fn to_regex_pattern(&self, rule_book: &RuleBook) -> String {
+        match self {
+            Rule::Match(c) => format!("{}", c),
+            Rule::Chain(components) => {
+                let mut chain_representation = String::new();
+                for (i, component) in components.iter().enumerate() {
+                    let rule = rule_book.get(component).unwrap();
+                    chain_representation += &rule.to_regex_pattern(rule_book);
+                }
+
+                chain_representation
+            },
+            Rule::Options(rule1, rule2) => {
+                format!("({}|{})", rule1.to_regex_pattern(rule_book), rule2.to_regex_pattern(rule_book))
+            }
         }
     }
     //endregion
@@ -222,4 +308,10 @@ fn main() {
     }
 
     println!("Part 1: {}", num_matches);
+
+    let rule_42 = rule_book.get(&42).unwrap();
+    println!("42 expanded\n{}", rule_42.to_regex_pattern(&rule_book));
+
+    let rule_11 = rule_book.get(&11).unwrap();
+    println!("11 expanded\n{}", rule_11.to_regex_pattern(&rule_book));
 }
