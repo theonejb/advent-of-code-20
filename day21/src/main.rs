@@ -1,17 +1,17 @@
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::RandomState;
 use std::fmt::{Display, Formatter, Result};
+use std::fs::File;
+use std::io::{BufRead, BufReader, Write};
 use std::iter::FromIterator;
+use std::path::Path;
 
 use itertools::{all, join};
 use regex::Regex;
-use std::fs::File;
-use std::path::Path;
-use std::io::{BufReader, BufRead, Write};
 
 mod tests;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct Food {
     ingredients: Vec<String>,
     allergens: Vec<String>,
@@ -135,20 +135,88 @@ impl FoodList {
     }
 
     pub fn find_valid_arrangement(&self) -> Option<Arrangement> {
-        self._find_valid_arrangement(Arrangement::new(), self.get_all_ingredients())
+        self._find_valid_arrangement(self.find_partial_arrangement(), self.get_all_ingredients())
     }
 
     pub fn get_possible_ingredients_for_allergen(&self, allergen: &str) -> Vec<String> {
-        let mut current_ingredients_list = HashSet::new();
+        let mut current_ingredients_list: HashSet<String> = HashSet::new();
+        let foods_with_this_allergen = self.get_foods_with_allergen(allergen);
 
-        vec![]
+        let first_food = foods_with_this_allergen.first().unwrap();
+        for i in first_food.ingredients.iter() {
+            current_ingredients_list.insert(i.clone());
+        }
+
+        for food in foods_with_this_allergen[1..].iter() {
+            let mut this_food_ingredients_list = HashSet::new();
+            for i in food.ingredients.iter() {
+                this_food_ingredients_list.insert(i.clone());
+            }
+
+            current_ingredients_list = current_ingredients_list.intersection(
+                &this_food_ingredients_list
+            ).cloned().collect();
+        }
+
+        let mut ingredients = Vec::from_iter(current_ingredients_list);
+        ingredients.sort();
+
+        ingredients
     }
+
     pub fn find_partial_arrangement(&self) -> Arrangement {
-        Arrangement::new()
+        let mut allergen_to_possible_ingredients = HashMap::new();
+        for allergen in self.get_all_allergens() {
+            let mut possible_ingredients = self.get_possible_ingredients_for_allergen(&allergen);
+            allergen_to_possible_ingredients.insert(
+                allergen,
+                possible_ingredients
+            );
+        }
+
+        let mut arrangement = Arrangement::new();
+        loop {
+            let mut new_allergen_to_possible_ingredients = HashMap::new();
+            let mut found_some_mapping = false;
+
+            for (allergen, possible_ingredients) in allergen_to_possible_ingredients.iter() {
+                if possible_ingredients.len() == 1 {
+                    let found_ingredient = &possible_ingredients[0];
+
+                    arrangement.add_allergen_for_ingredient(found_ingredient, allergen);
+
+                    for (this_allergen, possible_ingredients) in allergen_to_possible_ingredients.iter() {
+                        if allergen == this_allergen {
+                            continue;
+                        }
+
+                        new_allergen_to_possible_ingredients.insert(
+                            this_allergen.clone(),
+                            possible_ingredients.iter().cloned().filter(|a| {
+                                a != found_ingredient
+                            }).collect()
+                        );
+                    }
+
+                    found_some_mapping = true;
+                    break;
+                }
+
+                new_allergen_to_possible_ingredients.insert(
+                    allergen.clone(), possible_ingredients.clone()
+                );
+            }
+
+            allergen_to_possible_ingredients = new_allergen_to_possible_ingredients;
+            if !found_some_mapping {
+                break;
+            }
+        }
+
+        arrangement
     }
 
-    pub fn solve_part1(&self) -> usize {
-        let valid_arrangement = self.find_valid_arrangement().unwrap();
+    pub fn solve_part1(&self, valid_arrangement: &Arrangement) -> usize {
         let used_ingredients: HashSet<String, RandomState> = HashSet::from_iter(valid_arrangement.get_all_ingredients());
         let available_ingredients = self.get_all_ingredients();
 
@@ -171,8 +239,29 @@ impl FoodList {
         number_of_times_unused_ingredients_appear
     }
 
-    fn get_foods_with_allergen(&self, allergen: &str) -> Vec<Food> {
+    pub fn solve_part2(&self, valid_arrangement: &Arrangement) -> String {
+        let mut ingredient_and_allergen_list: Vec<(String, String)> = valid_arrangement.ingredient_allergen.iter().map(|(i, a)| {
+            (i.clone(), a.clone())
+        }).collect();
+        ingredient_and_allergen_list.sort_by_key(|(i, a)| {
+            a.clone()
+        });
 
+        join(ingredient_and_allergen_list.iter().map(|(i, a)| {
+            i.clone()
+        }), ",")
+    }
+
+    fn get_foods_with_allergen(&self, allergen: &str) -> Vec<Food> {
+        let mut foods = vec![];
+
+        for food in self.foods.iter() {
+            if food.allergens.contains(&String::from(allergen)) {
+                foods.push(food.clone());
+            }
+        }
+
+        foods
     }
 
     fn get_all_ingredients(&self) -> Vec<String> {
@@ -337,5 +426,12 @@ fn get_input(filename: &str) -> Vec<String> {
 fn main() {
     let input = get_input("input.txt");
     let food_list = FoodList::from_input(input);
-    println!("Part 1: {}", food_list.solve_part1());
+    let arrangement = food_list.find_valid_arrangement();
+    println!();
+    if let Some(arrangement) = arrangement {
+        println!("Part 1: {}", food_list.solve_part1(&arrangement));
+        println!("Part 2: {}", food_list.solve_part2(&arrangement));
+    } else {
+        println!("No arrangement found.");
+    }
 }

@@ -1,4 +1,5 @@
 use crate::*;
+use itertools::assert_equal;
 
 fn get_input_lines() -> Vec<String> {
     vec![
@@ -136,4 +137,27 @@ fn test_food_list_solve_part1() {
 fn test_food_list_find_partial_arrangement() {
     let food_list = FoodList::from_input(get_input_lines());
     println!("{}", food_list.find_partial_arrangement())
+}
+
+#[test]
+fn test_food_list_get_foods_with_allergen() {
+    let food_list = FoodList::from_input(get_input_lines());
+    assert_equal(food_list.get_foods_with_allergen("soy"), vec![
+        Food::from_description("sqjhc fvjkl (contains soy)")
+    ]);
+    assert_equal(food_list.get_foods_with_allergen("dairy"), vec![
+        Food::from_description("mxmxvkd kfcds sqjhc nhms (contains dairy, fish)"),
+        Food::from_description("trh fvjkl sbzzf mxmxvkd (contains dairy)")
+    ]);
+}
+
+#[test]
+fn test_food_list_get_possible_ingredients_for_allergen() {
+    let food_list = FoodList::from_input(get_input_lines());
+    assert_equal(food_list.get_possible_ingredients_for_allergen("dairy"),
+                 vec!["mxmxvkd"]);
+    assert_equal(food_list.get_possible_ingredients_for_allergen("soy"),
+                 vec!["fvjkl", "sqjhc"]);
+    assert_equal(food_list.get_possible_ingredients_for_allergen("fish"),
+                 vec!["mxmxvkd", "sqjhc"]);
 }
