@@ -88,7 +88,9 @@ struct Grid {
 }
 
 impl Grid {
-    pub fn new() ->
+    pub fn new() -> Grid {
+        Grid { grid: HashMap::new() }
+    }
 }
 
 fn solve1(input: &Vec<String>) -> usize {
